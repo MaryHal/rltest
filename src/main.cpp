@@ -1,6 +1,58 @@
 #include <cstdio>
 #include <libtcod/libtcod.hpp>
 
+class Player
+{
+    private:
+        int x;
+        int y;
+
+    public:
+        Player()
+            : x(0), y(0)
+        {
+        }
+
+        void handleInput(TCOD_key_t key)
+        {
+            putchar(key.c);
+            fflush(stdout);
+            if (key.pressed)
+            {
+                if (key.c == 'k')
+                    --y;
+                else if (key.c == 'j')
+                    ++y;
+                else if (key.c == 'h')
+                    --x;
+                else if (key.c == 'l')
+                    ++x;
+                else if (key.c == 'y')
+                {
+                    --y; --x;
+                }
+                else if (key.c == 'u')
+                {
+                    --y; ++x;
+                }
+                else if (key.c == 'b')
+                {
+                    ++y; --x;
+                }
+                else if (key.c == 'n')
+                {
+                    ++y; ++x;
+                }
+            }
+        }
+
+        void draw()
+        {
+            TCODConsole::root->setCharForeground(x, y, TCODColor::white);
+            TCODConsole::root->setChar(x, y, '@');
+        }
+};
+
 class State
 {
     protected:
@@ -16,6 +68,7 @@ class State
 class TestState : public State
 {
     private:
+        Player me;
 
     public:
         TestState()
@@ -28,6 +81,7 @@ class TestState : public State
 
         void handleInput(TCOD_key_t key)
         {
+            me.handleInput(key);
         }
 
         void logic()
@@ -36,8 +90,7 @@ class TestState : public State
 
         void draw()
         {
-            TCODConsole::root->setCharForeground(2, 5, TCODColor::white);
-            TCODConsole::root->setChar(2, 5, '@');
+            me.draw();
         }
 };
 
@@ -88,17 +141,17 @@ class Application
             running = true;
             while (running && !TCODConsole::isWindowClosed())
             {
-                currentState->logic();
                 currentState->draw();
-
                 TCODConsole::flush();
 
-                // Handle Input
-                // key = TCODConsole::check_for_keypress()  //real-time
-                TCOD_key_t key = TCODConsole::waitForKeypress(true);  //turn-based
+                currentState->logic();
+
+                //TCOD_key_t key = TCODConsole::checkForKeypress();  //real-time
+                TCOD_key_t key = TCODConsole::waitForKeypress(false);  //turn-based
                 if (key.vk == TCODK_ESCAPE)
                 {
                     running = false;
+                    continue;
                 }
 
                 currentState->handleInput(key);
