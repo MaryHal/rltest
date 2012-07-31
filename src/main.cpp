@@ -1,6 +1,56 @@
 #include <cstdio>
 #include <libtcod/libtcod.hpp>
 
+#include <map>
+
+struct Point
+{
+    int x;
+    int y;
+
+    Point()
+        : x(0),
+          y(0)
+    {
+    }
+    
+    Point(int x, int y)
+        : x(x),
+          y(y)
+    {
+    }
+};
+
+class Input
+{
+    private:
+        std::map<int, Point> movement;
+
+    public:
+        Input()
+        {
+            movement['h'] = Point(-1,  0);
+            movement['j'] = Point( 0,  1);
+            movement['k'] = Point( 0, -1);
+            movement['l'] = Point( 1,  0);
+            movement['y'] = Point(-1, -1);
+            movement['u'] = Point( 1, -1);
+            movement['b'] = Point(-1,  1);
+            movement['n'] = Point( 1,  1);
+        }
+
+        Point getMove(int ch)
+        {
+            return movement[ch];
+        }
+
+        TCOD_key_t getKey()
+        {
+            //return TCODConsole::checkForKeypress();
+            return TCODConsole::waitForKeypress(false);  //turn-based
+        }
+};
+
 class Player
 {
     private:
@@ -13,36 +63,15 @@ class Player
         {
         }
 
-        void handleInput(TCOD_key_t key)
+        void handleInput(const Input& input, TCOD_key_t key)
         {
-            putchar(key.c);
-            fflush(stdout);
             if (key.pressed)
             {
-                if (key.c == 'k')
-                    --y;
-                else if (key.c == 'j')
-                    ++y;
-                else if (key.c == 'h')
-                    --x;
-                else if (key.c == 'l')
-                    ++x;
-                else if (key.c == 'y')
-                {
-                    --y; --x;
-                }
-                else if (key.c == 'u')
-                {
-                    --y; ++x;
-                }
-                else if (key.c == 'b')
-                {
-                    ++y; --x;
-                }
-                else if (key.c == 'n')
-                {
-                    ++y; ++x;
-                }
+                Input i;
+                Point p = i.getMove(key.c);
+
+                x += p.x;
+                y += p.y;
             }
         }
 
@@ -60,7 +89,7 @@ class State
         State() {}
         virtual ~State() {}
 
-        virtual void handleInput(TCOD_key_t key) = 0;
+        virtual void handleInput(const Input& input, TCOD_key_t key) = 0;
         virtual void logic() = 0;
         virtual void draw() = 0;
 };
@@ -79,9 +108,9 @@ class TestState : public State
         {
         }
 
-        void handleInput(TCOD_key_t key)
+        void handleInput(const Input& input, TCOD_key_t key)
         {
-            me.handleInput(key);
+            me.handleInput(input, key);
         }
 
         void logic()
@@ -98,6 +127,8 @@ class Application
 {
     private:
         bool running;
+
+        Input input;
         State* currentState;
 
     public:
@@ -118,7 +149,7 @@ class Application
         {
             TCODConsole::setCustomFont("terminal8x8_aa_tc.png", TCOD_FONT_LAYOUT_TCOD);
 
-            TCODConsole::initRoot(80, 40, "Test Game", false, TCOD_RENDERER_SDL);
+            TCODConsole::initRoot(80, 40, "Test Game", false, TCOD_RENDERER_GLSL);
             TCODConsole::root->setDefaultBackground(TCODColor::black);
 
             // This is a Turn-based game. So this should be off.
@@ -146,15 +177,14 @@ class Application
 
                 currentState->logic();
 
-                //TCOD_key_t key = TCODConsole::checkForKeypress();  //real-time
-                TCOD_key_t key = TCODConsole::waitForKeypress(false);  //turn-based
+                TCOD_key_t key = input.getKey();
                 if (key.vk == TCODK_ESCAPE)
                 {
                     running = false;
                     continue;
                 }
 
-                currentState->handleInput(key);
+                currentState->handleInput(input, key);
             }
         }
 };
