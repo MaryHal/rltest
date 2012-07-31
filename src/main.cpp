@@ -29,6 +29,7 @@ class Input
     public:
         Input()
         {
+            // Vi-keys
             movement['h'] = Point(-1,  0);
             movement['j'] = Point( 0,  1);
             movement['k'] = Point( 0, -1);
@@ -37,11 +38,23 @@ class Input
             movement['u'] = Point( 1, -1);
             movement['b'] = Point(-1,  1);
             movement['n'] = Point( 1,  1);
+
+            // Numpad
+            movement[TCODK_4] = Point(-1,  0);
+            movement[TCODK_2] = Point( 0,  1);
+            movement[TCODK_8] = Point( 0, -1);
+            movement[TCODK_6] = Point( 1,  0);
+            movement[TCODK_7] = Point(-1, -1);
+            movement[TCODK_9] = Point( 1, -1);
+            movement[TCODK_1] = Point(-1,  1);
+            movement[TCODK_3] = Point( 1,  1);
         }
 
-        Point getMove(int ch)
+        Point getMove(TCOD_key_t key)
         {
-            return movement[ch];
+            if (key.vk == TCODK_CHAR)
+                return movement[key.c];
+            return movement[key.vk];
         }
 
         TCOD_key_t getKey()
@@ -68,7 +81,7 @@ class Player
             if (key.pressed)
             {
                 Input i;
-                Point p = i.getMove(key.c);
+                Point p = i.getMove(key);
 
                 x += p.x;
                 y += p.y;
