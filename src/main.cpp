@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <libtcod/libtcod.hpp>
 
+#include <vector>
 #include <map>
 #include <cstring>
 
@@ -21,15 +22,15 @@ template <typename T> class Rect
     bool collide(const Rect<T>& rect)
     {
         if (y > rect.y + rect.h)
-            return true;
+            return false;
         if (y + h < rect.y)
-            return true;
+            return false;
         if (x > rect.x + rect.w)
-            return true;
+            return false;
         if (x + w < rect.x)
-            return true;
+            return false;
 
-        return false;
+        return true;
     }
 };
 
@@ -142,7 +143,7 @@ class Player
 class Map : public Drawable
 {
     protected:
-    static const int MapHeight = 20;
+    static const int MapHeight = 30;
     static const int MapWidth  = 46;
 
     TCODMap tcodMap;
@@ -157,14 +158,19 @@ class Map : public Drawable
         mapConsole = new TCODConsole(MapWidth, MapHeight);
 
         // Clear everything.
-        tcodMap.clear(true, true);
-        std::memset(map, 0, sizeof(map));
+        clear();
     }
 
     virtual ~Map()
     {
         if (mapConsole)
             delete mapConsole;
+    }
+
+    virtual void clear()
+    {
+        tcodMap.clear(true, true);
+        std::memset(map, 0, sizeof(map));
     }
 
     virtual void generate()
@@ -180,8 +186,8 @@ class Map : public Drawable
 class DungeonMap : public Map
 {
     private:
-    static const int MinRoomSize = 3;
-    static const int MaxRoomSize = 6;
+    static const int MinRoomSize = 4;
+    static const int MaxRoomSize = 10;
 
     TCODPath* pathfinder;
     TCODRandom* random;
@@ -192,7 +198,7 @@ class DungeonMap : public Map
           pathfinder(NULL)
     {
         // No diagonal movements
-        //pathfinder = new TCODDijkstra(tcodMap, 0.0f);
+        pathfinder = new TCODPath(&tcodMap, 0.0f);
         random = TCODRandom::getInstance();
     }
 
@@ -202,21 +208,77 @@ class DungeonMap : public Map
             delete pathfinder;
     }
 
+    bool roomCollision(std::vector<IntRect>& roomList, IntRect& currentRoom)
+    {
+        // Check for collisions with all previous rooms
+        for (std::vector<IntRect>::iterator iter = roomList.begin();
+             iter != roomList.end();
+             ++iter)
+        {
+            if (currentRoom.collide(*iter))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     virtual void generate()
     {
-        const int numRooms = 6;
+        printf("Generatin\'\n");
+        const int numRooms = 3;
+        std::vector<IntRect> roomList;
+
         for (int i = 0; i < numRooms; ++i)
         {
-            IntRect r(random->get(0, MapWidth - MaxRoomSize),
+            IntRect r(random->get(0, MapWidth  - MaxRoomSize),
                       random->get(0, MapHeight - MaxRoomSize),
                       random->get(MinRoomSize, MaxRoomSize),
                       random->get(MinRoomSize, MaxRoomSize));
+
+            // Check for collisions with all previous rooms
+            if (roomCollision(roomList, r))
+            {
+                --i;
+                continue;
+            }
 
             for (int y = r.y; y < r.y + r.h; ++y)
             {
                 for (int x = r.x; x < r.x + r.w; ++x)
                 {
                     map[y][x] = '#';
+                }
+            }
+
+            // Everything checks out.
+            roomList.push_back(r);
+
+            if (roomList.size() > 1)
+            {
+                printf("Hello\n");
+
+                // We want the second-to-last item. I feel like this is ugly.
+                IntRect prevRoom = roomList.at(roomList.size() - 2);
+
+                pathfinder->compute(random->get(r.x + 1, r.x + r.w - 1),
+                                    random->get(r.y + 1, r.y + r.h - 1),
+                                    random->get(prevRoom.x + 1, prevRoom.x + prevRoom.w - 1),
+                                    random->get(prevRoom.y + 1, prevRoom.y + prevRoom.h - 1));
+
+                // Walk the path in reverse connecting the rooms
+                while (!pathfinder->isEmpty())
+                {
+                    int x;
+                    int y;
+                    if (pathfinder->walk(&x, &y, false))
+                    {
+                        printf("Walkin\' %d %d\n", x, y);
+                        map[y][x] = '#';
+                    }
+                    else
+                        printf("Whoops.");
                 }
             }
         }
@@ -232,6 +294,7 @@ class DungeonMap : public Map
                 console->setChar(x, y, map[y][x]);
             }
         }
+        Map::draw(console);
     }
 };
 
@@ -271,8 +334,11 @@ class TestState : public State
     void handleInput(Input& input, const TCOD_key_t& key)
     {
         me.handleInput(input, key);
-        if (key.c == 'q')
+        if (key.pressed && key.c == 'q')
+        {
+            map->clear();
             map->generate();
+        }
     }
 
     void logic()
@@ -281,8 +347,8 @@ class TestState : public State
 
     void draw()
     {
-        me.draw(TCODConsole::root);
         map->draw(TCODConsole::root);
+        me.draw(TCODConsole::root);
     }
 };
 
