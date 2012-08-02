@@ -8,7 +8,7 @@ ifndef verbose
 endif
 
 ifndef CC
-  CC = gcc
+  CC = clang
 endif
 
 ifndef CXX

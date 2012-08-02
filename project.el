@@ -12,5 +12,6 @@
 (global-set-key (kbd "<f6>") 'runProgram)
 
 (setq ac-clang-flags
-      (append ac-clang-flags (split-string (concat "-I" rootDir "src"))))
+      (append ac-clang-flags (split-string (concat "-I" rootDir "src")
+                                           "/usr/include/libtcod")))
 
