@@ -5,6 +5,24 @@
 #include <map>
 #include <cstring>
 
+struct Point
+{
+    int x;
+    int y;
+
+    Point()
+        : x(0),
+          y(0)
+    {
+    }
+
+    Point(int x, int y)
+        : x(x),
+          y(y)
+    {
+    }
+};
+
 template <typename T> class Rect
 {
     public:
@@ -17,6 +35,30 @@ template <typename T> class Rect
     Rect(T xcoord, T ycoord, T width, T height)
         : x(xcoord), y(ycoord), w(width), h(height)
     {
+    }
+
+    void normalize()
+    {
+        if (x > x + w)
+        {
+            x = x + w;
+            w = -w;
+        }
+
+        if (y > y + h)
+        {
+            y = y + h;
+            h = -h;
+        }
+    }
+
+    bool collide(const Point& point)
+    {
+        if (point.x > x && point.x < x + w)
+            return true;
+        if (point.y > y && point.y < y + h)
+            return true;
+        return false;
     }
 
     bool collide(const Rect<T>& rect)
@@ -35,24 +77,6 @@ template <typename T> class Rect
 };
 
 typedef Rect<int> IntRect;
-
-struct Point
-{
-    int x;
-    int y;
-
-    Point()
-        : x(0),
-          y(0)
-    {
-    }
-
-    Point(int x, int y)
-        : x(x),
-          y(y)
-    {
-    }
-};
 
 class Input
 {
@@ -227,7 +251,7 @@ class DungeonMap : public Map
     virtual void generate()
     {
         printf("Generatin\'\n");
-        const int numRooms = 3;
+        const int numRooms = 6;
         std::vector<IntRect> roomList;
 
         for (int i = 0; i < numRooms; ++i)
@@ -248,8 +272,25 @@ class DungeonMap : public Map
             {
                 for (int x = r.x; x < r.x + r.w; ++x)
                 {
-                    map[y][x] = '#';
+                    map[y][x] = ' ';
                 }
+            }
+
+            map[r.y][r.x]                     = '+';
+            map[r.y][r.x + r.w - 1]           = '+';
+            map[r.y + r.h - 1][r.x]           = '+';
+            map[r.y + r.h - 1][r.x + r.w - 1] = '+';
+
+            for (int i = r.x + 1; i < r.x + r.w - 1; ++i)
+            {
+                map[r.y][i]           = '-';
+                map[r.y + r.h - 1][i] = '-';
+            }
+
+            for (int i = r.y + 1; i < r.y + r.h - 1; ++i)
+            {
+                map[i][r.x]           = '|';
+                map[i][r.x + r.w - 1] = '|';
             }
 
             // Everything checks out.
@@ -257,8 +298,6 @@ class DungeonMap : public Map
 
             if (roomList.size() > 1)
             {
-                printf("Hello\n");
-
                 // We want the second-to-last item. I feel like this is ugly.
                 IntRect prevRoom = roomList.at(roomList.size() - 2);
 
