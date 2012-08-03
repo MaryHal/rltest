@@ -193,7 +193,7 @@ class Map : public Drawable
 
     virtual void clear()
     {
-        tcodMap.clear(true, true);
+        tcodMap.clear(false, true);
         std::memset(map, 0, sizeof(map));
     }
 
@@ -211,7 +211,7 @@ class DungeonMap : public Map
 {
     private:
     static const int MinRoomSize = 4;
-    static const int MaxRoomSize = 10;
+    static const int MaxRoomSize = 12;
 
     TCODPath* pathfinder;
     TCODRandom* random;
@@ -248,18 +248,68 @@ class DungeonMap : public Map
         return false;
     }
 
+    void snapToEdge(const IntRect& room, Point& p)
+    {
+        switch (random->get(0, 3))
+        {
+        case 0: // Left
+            p.x = room.x;
+            break;
+        case 1: // Right
+            p.x = room.x + room.w;
+            break;
+        case 2: // Up
+            p.y = room.y;
+            break;
+        case 3:
+            p.y = room.y + room.h;
+            break;
+        default:
+            break;
+        }
+    };
+
+    void copyRoom(const IntRect& r)
+    {
+        for (int y = r.y; y <= r.y + r.h; ++y)
+        {
+            for (int x = r.x; x <= r.x + r.w; ++x)
+            {
+                tcodMap.setProperties(x, y, true, false);
+                map[y][x] = ' ';
+            }
+        }
+
+        map[r.y][r.x]             = '+';
+        map[r.y][r.x + r.w]       = '+';
+        map[r.y + r.h][r.x]       = '+';
+        map[r.y + r.h][r.x + r.w] = '+';
+
+        for (int i = r.x + 1; i < r.x + r.w; ++i)
+        {
+            map[r.y][i]       = '-';
+            map[r.y + r.h][i] = '-';
+        }
+
+        for (int i = r.y + 1; i < r.y + r.h; ++i)
+        {
+            map[i][r.x]       = '|';
+            map[i][r.x + r.w] = '|';
+        }
+    }
+
     virtual void generate()
     {
         printf("Generatin\'\n");
-        const int numRooms = 6;
+        const int numRooms = 4;
         std::vector<IntRect> roomList;
 
         for (int i = 0; i < numRooms; ++i)
         {
-            IntRect r(random->get(0, MapWidth  - MaxRoomSize),
-                      random->get(0, MapHeight - MaxRoomSize),
-                      random->get(MinRoomSize, MaxRoomSize),
-                      random->get(MinRoomSize, MaxRoomSize));
+            IntRect r(random->get(1, MapWidth  - MaxRoomSize - 2),
+                      random->get(1, MapHeight - MaxRoomSize - 2),
+                      random->get(MinRoomSize - 1, MaxRoomSize - 1),
+                      random->get(MinRoomSize - 1, MaxRoomSize - 1));
 
             // Check for collisions with all previous rooms
             if (roomCollision(roomList, r))
@@ -268,30 +318,7 @@ class DungeonMap : public Map
                 continue;
             }
 
-            for (int y = r.y; y < r.y + r.h; ++y)
-            {
-                for (int x = r.x; x < r.x + r.w; ++x)
-                {
-                    map[y][x] = ' ';
-                }
-            }
-
-            map[r.y][r.x]                     = '+';
-            map[r.y][r.x + r.w - 1]           = '+';
-            map[r.y + r.h - 1][r.x]           = '+';
-            map[r.y + r.h - 1][r.x + r.w - 1] = '+';
-
-            for (int i = r.x + 1; i < r.x + r.w - 1; ++i)
-            {
-                map[r.y][i]           = '-';
-                map[r.y + r.h - 1][i] = '-';
-            }
-
-            for (int i = r.y + 1; i < r.y + r.h - 1; ++i)
-            {
-                map[i][r.x]           = '|';
-                map[i][r.x + r.w - 1] = '|';
-            }
+            copyRoom(r);
 
             // Everything checks out.
             roomList.push_back(r);
@@ -301,10 +328,23 @@ class DungeonMap : public Map
                 // We want the second-to-last item. I feel like this is ugly.
                 IntRect prevRoom = roomList.at(roomList.size() - 2);
 
-                pathfinder->compute(random->get(r.x + 1, r.x + r.w - 1),
-                                    random->get(r.y + 1, r.y + r.h - 1),
-                                    random->get(prevRoom.x + 1, prevRoom.x + prevRoom.w - 1),
-                                    random->get(prevRoom.y + 1, prevRoom.y + prevRoom.h - 1));
+                Point p1(random->get(r.x + 1, r.x + r.w - 1),
+                         random->get(r.y + 1, r.y + r.h - 1));
+
+                Point p2(random->get(prevRoom.x + 1, prevRoom.x + prevRoom.w - 1),
+                         random->get(prevRoom.y + 1, prevRoom.y + prevRoom.h - 1));
+
+                snapToEdge(r, p1);
+                snapToEdge(prevRoom, p2);
+
+                tcodMap.setProperties(p1.x, p1.y, true, true);
+                tcodMap.setProperties(p2.x, p2.y, true, true);
+
+                pathfinder->compute(p1.x, p1.y,
+                                    p2.x, p2.y);
+
+                map[p1.y][p1.x] = 'X';
+                map[p2.y][p2.x] = 'X';
 
                 // Walk the path in reverse connecting the rooms
                 while (!pathfinder->isEmpty())
@@ -314,6 +354,7 @@ class DungeonMap : public Map
                     if (pathfinder->walk(&x, &y, false))
                     {
                         printf("Walkin\' %d %d\n", x, y);
+                        tcodMap.setProperties(x, y, true, true);
                         map[y][x] = '#';
                     }
                     else
